@@ -1,5 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
+import { validateCreatePost } from "../middlewares/postValidation.mjs";
 
 const postsRouter = Router();
 
@@ -72,7 +73,7 @@ postsRouter.get("/", async (req, res) => {
   }
 });
 
-postsRouter.post("/", async (req, res) => {
+postsRouter.post("/", validateCreatePost, async (req, res) => {
   const newPost = req.body;
 
   try {
@@ -119,7 +120,7 @@ postsRouter.get("/:postId", async (req, res) => {
   }
 });
 
-postsRouter.put("/:postId", async (req, res) => {
+postsRouter.put("/:postId", validateCreatePost, async (req, res) => {
   const postId = req.params.postId;
   const updatedPost = req.body;
 
