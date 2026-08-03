@@ -1,9 +1,8 @@
 import * as pg from "pg";
-const { Pool } = pg;
+const { Pool } = pg.default;
 
 const connectionPool = new Pool({
-    connectionString: 
-    "postgresql://postgres:supabase159963@db.oydwfktroppqjdwpbzpa.supabase.co:5432/postgres"
+  connectionString: process.env.CONNECTION_STRING,
 });
 
 export default connectionPool;
