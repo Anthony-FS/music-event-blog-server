@@ -212,7 +212,8 @@ try {
       date timestamp default current_date,
       content text not null,
       status_id integer references public.statuses(id),
-      likes_count integer default 0
+      likes_count integer default 0,
+      author_id uuid not null references public.profiles(id)
     )
   `);
 
@@ -239,12 +240,20 @@ try {
     throw new Error("Published status was not found");
   }
 
+  const authorResult = await client.query(
+    `select id from public.profiles where role = 'admin' order by id limit 1`,
+  );
+
+  if (!authorResult.rowCount) {
+    throw new Error("An admin profile is required to seed articles");
+  }
+
   let insertedCount = 0;
 
   for (const article of articles) {
     const result = await client.query(
       `insert into public.posts
-        (title, image, category_id, description, content, status_id, date)
+        (title, image, category_id, description, content, status_id, date, author_id)
        select
          $1::varchar,
          $2::text,
@@ -252,7 +261,8 @@ try {
          $4::text,
          $5::text,
          $6::integer,
-         $7::timestamp
+         $7::timestamp,
+         $8::uuid
        from public.categories
        where lower(categories.name) = lower($3::varchar)
          and not exists (
@@ -269,6 +279,7 @@ try {
         article.content,
         statusResult.rows[0].id,
         article.date,
+        authorResult.rows[0].id,
       ],
     );
 

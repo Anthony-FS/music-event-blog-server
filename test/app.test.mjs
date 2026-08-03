@@ -44,6 +44,36 @@ test("liking an article requires authentication", async () => {
   assert.equal(response.body.message, "Authentication is required");
 });
 
+test("unliking an article requires authentication", async () => {
+  const response = await request(app).delete("/posts/1/likes");
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.message, "Authentication is required");
+});
+
+test("adding a comment requires authentication", async () => {
+  const response = await request(app)
+    .post("/posts/1/comments")
+    .send({ message: "Test comment" });
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.message, "Authentication is required");
+});
+
+test("reading notifications requires authentication", async () => {
+  const response = await request(app).get("/notifications");
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.message, "Authentication is required");
+});
+
+test("marking notifications read requires authentication", async () => {
+  const response = await request(app).patch("/notifications/read");
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.message, "Authentication is required");
+});
+
 test("category mutations require authentication", async () => {
   const response = await request(app).post("/categories").send({});
 

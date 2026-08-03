@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import categoriesRouter from "./routes/categories.mjs";
+import notificationsRouter from "./routes/notifications.mjs";
 import postsRouter from "./routes/posts.mjs";
 import protectUser from "./middlewares/protectUser.mjs";
 import protectAdmin from "./middlewares/protectAdmin.mjs";
@@ -33,6 +34,7 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 
 app.use("/categories", categoriesRouter);
+app.use("/notifications", notificationsRouter);
 app.use("/posts", postsRouter);
 
 app.get("/test", (_req, res) => {

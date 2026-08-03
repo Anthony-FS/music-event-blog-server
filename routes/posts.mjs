@@ -22,10 +22,35 @@ const postSelect = `
       else statuses.status
     end as status,
     posts.date,
-    posts.likes_count as likes
+    posts.likes_count as likes,
+    posts.author_id as "authorId",
+    coalesce(
+      nullif(trim(authors.name), ''),
+      nullif(trim(authors.username), ''),
+      'Admin'
+    ) as author,
+    authors.avatar_url as "authorAvatar",
+    authors.bio as "authorBio"
   from posts
   left join categories on posts.category_id = categories.id
   left join statuses on posts.status_id = statuses.id
+  left join profiles as authors on posts.author_id = authors.id
+`;
+
+const commentSelect = `
+  select
+    comments.id,
+    comments.user_id as "userId",
+    coalesce(
+      nullif(trim(profiles.name), ''),
+      nullif(trim(profiles.username), ''),
+      'Member'
+    ) as name,
+    profiles.avatar_url as avatar,
+    comments.comment_text as message,
+    comments.created_at as "createdAt"
+  from comments
+  join profiles on comments.user_id = profiles.id
 `;
 
 postsRouter.get("/", identifyAdmin, async (req, res) => {
@@ -101,6 +126,40 @@ postsRouter.get("/", identifyAdmin, async (req, res) => {
   }
 });
 
+postsRouter.get("/:postId/comments", identifyAdmin, async (req, res) => {
+  const postId = toId(req.params.postId);
+
+  if (!postId) {
+    return res.status(400).json({ message: "Invalid article id" });
+  }
+
+  try {
+    const postResult = await connectionPool.query(
+      `select statuses.status
+       from posts
+       left join statuses on posts.status_id = statuses.id
+       where posts.id = $1`,
+      [postId],
+    );
+    const post = postResult.rows[0];
+
+    if (!post || (post.status === "draft" && req.user?.role !== "admin")) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    const commentsResult = await connectionPool.query(
+      `${commentSelect}
+       where comments.post_id = $1
+       order by comments.created_at desc, comments.id desc`,
+      [postId],
+    );
+
+    return res.status(200).json({ comments: commentsResult.rows });
+  } catch {
+    return res.status(500).json({ message: "Unable to load comments" });
+  }
+});
+
 postsRouter.get("/:postId", identifyAdmin, async (req, res) => {
   const postId = toId(req.params.postId);
 
@@ -162,8 +221,8 @@ postsRouter.post("/", protectAdmin, validateCreatePost, async (req, res) => {
 
     const insertResult = await client.query(
       `insert into posts
-        (title, image, category_id, description, content, status_id)
-       values ($1, $2, $3, $4, $5, $6)
+        (title, image, category_id, description, content, status_id, author_id)
+       values ($1, $2, $3, $4, $5, $6, $7)
        returning id`,
       [
         title,
@@ -172,6 +231,7 @@ postsRouter.post("/", protectAdmin, validateCreatePost, async (req, res) => {
         description,
         content,
         statusResult.rows[0].id,
+        req.user.id,
       ],
     );
     const created = await client.query(
@@ -201,7 +261,7 @@ postsRouter.post("/:postId/likes", protectUser, async (req, res) => {
   try {
     await client.query("begin");
     const postResult = await client.query(
-      `select likes_count from posts where id = $1 for update`,
+      `select likes_count, author_id from posts where id = $1 for update`,
       [postId],
     );
 
@@ -217,6 +277,20 @@ postsRouter.post("/:postId/likes", protectUser, async (req, res) => {
        returning post_id`,
       [postId, req.user.id],
     );
+
+    if (
+      likeResult.rowCount &&
+      postResult.rows[0].author_id !== req.user.id
+    ) {
+      await client.query(
+        `insert into notifications
+          (recipient_id, actor_id, post_id, event_type)
+         values ($1, $2, $3, 'like')
+         on conflict do nothing`,
+        [postResult.rows[0].author_id, req.user.id, postId],
+      );
+    }
+
     const countResult = await client.query(
       `select likes_count from posts where id = $1`,
       [postId],
@@ -232,6 +306,137 @@ postsRouter.post("/:postId/likes", protectUser, async (req, res) => {
   } catch {
     await client.query("rollback");
     return res.status(500).json({ message: "Unable to like the article" });
+  } finally {
+    client.release();
+  }
+});
+
+postsRouter.post("/:postId/comments", protectUser, async (req, res) => {
+  const postId = toId(req.params.postId);
+  const message = String(req.body.message ?? "").trim();
+
+  if (!postId) {
+    return res.status(400).json({ message: "Invalid article id" });
+  }
+
+  if (!message) {
+    return res.status(400).json({ message: "Comment is required" });
+  }
+
+  if (message.length > 1000) {
+    return res
+      .status(400)
+      .json({ message: "Comment must be 1000 characters or fewer" });
+  }
+
+  const client = await connectionPool.connect();
+
+  try {
+    await client.query("begin");
+    const postResult = await client.query(
+      `select posts.author_id
+       from posts
+       join statuses on posts.status_id = statuses.id
+       where posts.id = $1 and statuses.status = 'publish'
+       for share`,
+      [postId],
+    );
+
+    if (!postResult.rowCount) {
+      await client.query("rollback");
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    const insertResult = await client.query(
+      `insert into comments (post_id, user_id, comment_text)
+       values ($1, $2, $3)
+       returning id`,
+      [postId, req.user.id, message],
+    );
+
+    if (postResult.rows[0].author_id !== req.user.id) {
+      await client.query(
+        `insert into notifications
+          (recipient_id, actor_id, post_id, event_type, comment_id)
+         values ($1, $2, $3, 'comment', $4)`,
+        [
+          postResult.rows[0].author_id,
+          req.user.id,
+          postId,
+          insertResult.rows[0].id,
+        ],
+      );
+    }
+
+    const commentResult = await client.query(
+      `${commentSelect} where comments.id = $1`,
+      [insertResult.rows[0].id],
+    );
+
+    await client.query("commit");
+    return res.status(201).json({ comment: commentResult.rows[0] });
+  } catch {
+    await client.query("rollback");
+    return res.status(500).json({ message: "Unable to add the comment" });
+  } finally {
+    client.release();
+  }
+});
+
+postsRouter.delete("/:postId/likes", protectUser, async (req, res) => {
+  const postId = toId(req.params.postId);
+
+  if (!postId) {
+    return res.status(400).json({ message: "Invalid article id" });
+  }
+
+  const client = await connectionPool.connect();
+
+  try {
+    await client.query("begin");
+    const postResult = await client.query(
+      `select id, author_id from posts where id = $1 for update`,
+      [postId],
+    );
+
+    if (!postResult.rowCount) {
+      await client.query("rollback");
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    const unlikeResult = await client.query(
+      `delete from post_likes
+       where post_id = $1 and user_id = $2
+       returning post_id`,
+      [postId, req.user.id],
+    );
+
+    if (unlikeResult.rowCount) {
+      await client.query(
+        `delete from notifications
+         where recipient_id = $1
+           and actor_id = $2
+           and post_id = $3
+           and event_type = 'like'`,
+        [postResult.rows[0].author_id, req.user.id, postId],
+      );
+    }
+
+    const countResult = await client.query(
+      `select likes_count from posts where id = $1`,
+      [postId],
+    );
+    const likes = Number(countResult.rows[0].likes_count ?? 0);
+
+    await client.query("commit");
+    return res.status(200).json({
+      likes,
+      likedByUser: false,
+      alreadyUnliked: unlikeResult.rowCount === 0,
+    });
+  } catch {
+    await client.query("rollback");
+    return res.status(500).json({ message: "Unable to unlike the article" });
   } finally {
     client.release();
   }
