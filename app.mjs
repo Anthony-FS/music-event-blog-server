@@ -1,32 +1,45 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import categoriesRouter from "./routes/categories.mjs";
 import postsRouter from "./routes/posts.mjs";
 import protectUser from "./middlewares/protectUser.mjs";
 import protectAdmin from "./middlewares/protectAdmin.mjs";
 
 const app = express();
 const port = process.env.PORT || 4000;
+const allowedOrigins = new Set(
+  [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://music-event-blog.vercel.app",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean),
+);
 
-app.use(cors(
-  {
-  origin: [
-    "http://localhost:5173", // Frontend local (Vite)
-    "http://localhost:3000", // Frontend local (React แบบอื่น)
-    "https://music-event-blog.vercel.app", // Frontend ที่ Deploy แล้ว
-  ],
-  }
-));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
 
-app.use(express.json());
+      callback(new Error("Origin is not allowed by CORS"));
+    },
+  }),
+);
 
+app.use(express.json({ limit: "1mb" }));
+
+app.use("/categories", categoriesRouter);
 app.use("/posts", postsRouter);
 
-app.get("/test", (req, res) => {
+app.get("/test", (_req, res) => {
   res.send("Hello TechUp!");
 });
 
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.status(200).json({ message: "OK" });
 });
 
@@ -38,6 +51,22 @@ app.get("/admin-only", protectAdmin, (req, res) => {
   res.json({ message: "This is admin-only content", admin: req.user });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running at ${port}`);
+app.use((_req, res) => {
+  res.status(404).json({ message: "Route not found" });
 });
+
+app.use((error, _req, res, _next) => {
+  if (error.message === "Origin is not allowed by CORS") {
+    return res.status(403).json({ message: error.message });
+  }
+
+  return res.status(500).json({ message: "Internal server error" });
+});
+
+if (!process.env.VERCEL && process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    console.log(`Server is running at ${port}`);
+  });
+}
+
+export default app;

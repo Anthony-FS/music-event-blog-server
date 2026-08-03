@@ -5,7 +5,6 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "multer": "^2.2.0",
-    "nodemon": "^3.1.14",
     "pg": "^8.22.0"
   },
   "name": "music-event-blog-server",
@@ -13,11 +12,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon app.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon app.mjs",
+    "start": "node app.mjs",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module",
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
+  }
 }
