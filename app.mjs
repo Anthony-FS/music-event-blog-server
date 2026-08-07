@@ -5,8 +5,6 @@ import avatarsRouter from "./routes/avatars.mjs";
 import categoriesRouter from "./routes/categories.mjs";
 import notificationsRouter from "./routes/notifications.mjs";
 import postsRouter from "./routes/posts.mjs";
-import protectUser from "./middlewares/protectUser.mjs";
-import protectAdmin from "./middlewares/protectAdmin.mjs";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -39,20 +37,8 @@ app.use("/categories", categoriesRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/posts", postsRouter);
 
-app.get("/test", (_req, res) => {
-  res.send("Hello TechUp!");
-});
-
 app.get("/health", (_req, res) => {
   res.status(200).json({ message: "OK" });
-});
-
-app.get("/protected-route", protectUser, (req, res) => {
-  res.json({ message: "This is protected content", user: req.user });
-});
-
-app.get("/admin-only", protectAdmin, (req, res) => {
-  res.json({ message: "This is admin-only content", admin: req.user });
 });
 
 app.use((_req, res) => {
