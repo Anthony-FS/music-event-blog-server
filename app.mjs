@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import avatarsRouter from "./routes/avatars.mjs";
 import categoriesRouter from "./routes/categories.mjs";
 import notificationsRouter from "./routes/notifications.mjs";
 import postsRouter from "./routes/posts.mjs";
@@ -33,6 +34,7 @@ app.use(
 
 app.use(express.json({ limit: "1mb" }));
 
+app.use("/avatars", avatarsRouter);
 app.use("/categories", categoriesRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/posts", postsRouter);

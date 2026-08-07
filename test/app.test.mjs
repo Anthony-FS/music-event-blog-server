@@ -81,6 +81,13 @@ test("category mutations require authentication", async () => {
   assert.equal(response.body.message, "Authentication is required");
 });
 
+test("avatar uploads require authentication", async () => {
+  const response = await request(app).post("/avatars");
+
+  assert.equal(response.status, 401);
+  assert.equal(response.body.message, "Authentication is required");
+});
+
 test("unapproved browser origins are rejected", async () => {
   const response = await request(app)
     .get("/health")

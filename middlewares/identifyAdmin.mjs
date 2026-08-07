@@ -1,4 +1,4 @@
-import connectionPool from "../utils/db.mjs";
+import * as userRepository from "../repositories/userRepository.mjs";
 import supabase from "../utils/supabase.mjs";
 
 export default async function identifyAdmin(req, _res, next) {
@@ -15,14 +15,11 @@ export default async function identifyAdmin(req, _res, next) {
       return next();
     }
 
-    const { rows } = await connectionPool.query(
-      `select role from profiles where id = $1`,
-      [data.user.id],
-    );
+    const profile = await userRepository.findProfileRole(data.user.id);
 
     req.user = {
       ...data.user,
-      role: rows[0]?.role ?? "member",
+      role: profile?.role ?? "member",
     };
   } catch {
     // Public reads remain available if optional identity lookup fails.

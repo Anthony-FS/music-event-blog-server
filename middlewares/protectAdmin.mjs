@@ -1,4 +1,4 @@
-import connectionPool from "../utils/db.mjs";
+import * as userRepository from "../repositories/userRepository.mjs";
 import supabase from "../utils/supabase.mjs";
 
 const protectAdmin = async (req, res, next) => {
@@ -15,16 +15,13 @@ const protectAdmin = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
 
-    const { rows } = await connectionPool.query(
-      `select role from profiles where id = $1`,
-      [data.user.id],
-    );
+    const profile = await userRepository.findProfileRole(data.user.id);
 
-    if (!rows.length) {
+    if (!profile) {
       return res.status(403).json({ message: "Admin access is required" });
     }
 
-    req.user = { ...data.user, role: rows[0].role };
+    req.user = { ...data.user, role: profile.role };
 
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access is required" });
