@@ -10,5 +10,6 @@ export function sendControllerError(res, error, fallbackMessage) {
     return res.status(error.status).json({ message: error.message });
   }
 
+  console.error(fallbackMessage, error);
   return res.status(500).json({ message: fallbackMessage });
 }

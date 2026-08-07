@@ -41,6 +41,26 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ message: "OK" });
 });
 
+app.get("/health/db", async (_req, res) => {
+  try {
+    const { default: connectionPool } = await import("./utils/db.mjs");
+    const result = await connectionPool.query(
+      "select count(*)::int as posts from posts",
+    );
+
+    return res.status(200).json({
+      message: "OK",
+      posts: result.rows[0].posts,
+    });
+  } catch (error) {
+    console.error("Database health check failed:", error);
+    return res.status(500).json({
+      message: "Database connection failed",
+      error: error.message,
+    });
+  }
+});
+
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
