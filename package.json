@@ -14,7 +14,8 @@
   "scripts": {
     "dev": "nodemon app.mjs",
     "start": "node app.mjs",
-    "test": "node --test"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
   "type": "module",
   "devDependencies": {
     "nodemon": "^3.1.14",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
   }
 }
