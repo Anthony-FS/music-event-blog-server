@@ -3,7 +3,9 @@ export function validateCreatePost(req, res, next) {
   const image = cleanString(req.body.image);
   const description = cleanString(req.body.description);
   const content = cleanString(req.body.content);
-  const categoryId = Number(req.body.categoryId ?? req.body.category_id);
+  const rawCategoryId = req.body.categoryId ?? req.body.category_id;
+  const categoryId =
+    typeof rawCategoryId === "number" ? rawCategoryId : Number.NaN;
   const requestedStatus = cleanString(req.body.status).toLowerCase();
   const status = requestedStatus === "published" ? "publish" : requestedStatus;
 
