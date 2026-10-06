@@ -15,7 +15,9 @@
     "dev": "nodemon app.mjs",
     "start": "node app.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.mjs e2e/smoke.test.mjs",
+    "test:e2e:mocked": "vitest run --config vitest.e2e.config.mjs e2e/mocked"
   },
   "keywords": [],
   "author": "",
