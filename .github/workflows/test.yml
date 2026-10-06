@@ -1,0 +1,42 @@
+name: Test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  # The live smoke suite hits the deployed API, so nightly plus manual only.
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  # Unit + integration + hermetic e2e: no real database or Supabase needed.
+  test:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://test:test@localhost:5432/test
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_ANON_KEY: test-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:e2e:mocked
+
+  # Read-only requests against the deployed API.
+  e2e-live:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e
